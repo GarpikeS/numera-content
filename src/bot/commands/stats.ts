@@ -16,15 +16,15 @@ export async function statsCommand(ctx: BotContext): Promise<void> {
   const activeIdeas = ideaQueries.countActive();
 
   await ctx.reply(
-    `<b>Статистика</b>\n\n` +
-    `Каналы: ${channels}\n` +
-    `Собрано сообщений: ${messages}\n` +
-    `Дайджестов: ${digests}\n` +
-    `Опубликовано: ${published}\n` +
-    `На модерации: ${pending}\n` +
+    `<b>Numera Content — статистика</b>\n\n` +
+    `Источники: ${channels}\n` +
+    `Собрано из каналов: ${messages}\n` +
+    `Сводок рынка: ${digests}\n\n` +
+    `Опубликовано в @Numeramining: ${published}\n` +
+    `На проверке: ${pending}\n` +
     `Запланировано: ${scheduled}\n` +
-    `Сегодня: ${todayPosts}\n` +
-    `Активных идей: ${activeIdeas}`,
+    `Сегодня опубликовано: ${todayPosts}\n\n` +
+    `Идей в очереди: ${activeIdeas}`,
     { parse_mode: 'HTML' }
   );
 }

@@ -21,13 +21,13 @@ async function handleList(ctx: BotContext): Promise<void> {
   const channels = channelQueries.getAll();
   if (channels.length === 0) {
     await ctx.reply(
-      'Нет каналов.\n\n' +
+      'Нет источников.\n\n' +
       'Добавить: /channels add @username Название'
     );
     return;
   }
 
-  await ctx.reply('Мониторимые каналы:', {
+  await ctx.reply(`Источники контента (${channels.length}):`, {
     reply_markup: getChannelListKeyboard(channels),
   });
 }

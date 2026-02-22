@@ -38,12 +38,12 @@ export function createBot(): Bot<BotContext> {
   bot.command('settings', settingsCommand);
 
   // Reply keyboard text handlers
-  bot.hears('Дайджест', digestCommand);
-  bot.hears('Генерация', generateCommand);
-  bot.hears('Идеи', ideasCommand);
-  bot.hears('Модерация', pendingCommand);
-  bot.hears('Стат', statsCommand);
-  bot.hears('Каналы', channelsCommand);
+  bot.hears('Сводка рынка', digestCommand);
+  bot.hears('Новый пост', generateCommand);
+  bot.hears('Мои идеи', ideasCommand);
+  bot.hears('На проверке', pendingCommand);
+  bot.hears('Статистика', statsCommand);
+  bot.hears('Источники', channelsCommand);
 
   // Callback queries
   bot.callbackQuery(/^review:/, reviewCallback);

@@ -4,17 +4,17 @@ import { logger } from '../../logger';
 import { truncate } from '../../utils/truncate';
 
 export async function digestCommand(ctx: BotContext): Promise<void> {
-  await ctx.reply('Формирую дайджест...');
+  await ctx.reply('Собираю сводку рынка из крипто-каналов...');
 
   try {
     const digest = await digestGenerator.generate();
     if (!digest) {
-      await ctx.reply('Нет новых сообщений для дайджеста.');
+      await ctx.reply('Нет новых сообщений из каналов. Сканирование идёт каждые 2 часа.');
       return;
     }
 
     await ctx.reply(
-      `<b>Дайджест</b> (${digest.message_count} сообщ.)\n\n${truncate(digest.summary)}`,
+      `<b>Сводка рынка</b> (${digest.message_count} источников)\n\n${truncate(digest.summary)}`,
       { parse_mode: 'HTML' }
     );
   } catch (err) {
