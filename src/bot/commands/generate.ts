@@ -1,6 +1,7 @@
 import type { BotContext } from '../context';
 import { postGenerator } from '../../services/post-generator';
-import { getReviewKeyboard } from '../keyboards/review';
+import { postQueries } from '../../database/queries/posts';
+import { getReviewKeyboard, formatSlotLabel } from '../keyboards/review';
 import { logger } from '../../logger';
 import { truncate } from '../../utils/truncate';
 
@@ -17,15 +18,18 @@ export async function generateCommand(ctx: BotContext): Promise<void> {
       return;
     }
 
-    // Try HTML first, fallback to plain text
+    const slot = postQueries.findNextFreeSlot();
+    const label = formatSlotLabel(slot);
+
     try {
       await ctx.reply(truncate(post.content), {
         parse_mode: 'HTML',
-        reply_markup: getReviewKeyboard(post.id),
+        reply_markup: getReviewKeyboard(post.id, label),
       });
     } catch {
       await ctx.reply(truncate(post.content), {
-        reply_markup: getReviewKeyboard(post.id),
+        parse_mode: undefined,
+        reply_markup: getReviewKeyboard(post.id, label),
       });
     }
   } catch (err) {

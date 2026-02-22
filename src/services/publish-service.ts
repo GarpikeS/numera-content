@@ -43,10 +43,7 @@ export const publishService = {
     const posts = postQueries.getScheduled();
     let published = 0;
 
-    const todayCount = postQueries.countToday();
-    const remaining = config.MAX_POSTS_PER_DAY - todayCount;
-
-    for (const post of posts.slice(0, remaining)) {
+    for (const post of posts) {
       const ok = await this.publish(post.id);
       if (ok) published++;
     }

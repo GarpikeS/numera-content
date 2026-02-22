@@ -8,7 +8,7 @@ import { publishService } from './publish-service';
 import { postQueries } from '../database/queries/posts';
 import { logger } from '../logger';
 import { truncate } from '../utils/truncate';
-import { getReviewKeyboard } from '../bot/keyboards/review';
+import { getReviewKeyboard, formatSlotLabel } from '../bot/keyboards/review';
 
 const tasks: cron.ScheduledTask[] = [];
 let api: Api<RawApi> | null = null;
@@ -19,8 +19,9 @@ const PUBLISH_SLOTS = [9, 13, 18];
 async function notifyOwner(text: string, postId?: number): Promise<void> {
   if (!api) return;
   try {
+    const slotLabel = postId ? formatSlotLabel(postQueries.findNextFreeSlot()) : undefined;
     await api.sendMessage(config.OWNER_ID, text, {
-      ...(postId ? { reply_markup: getReviewKeyboard(postId) } : {}),
+      ...(postId ? { reply_markup: getReviewKeyboard(postId, slotLabel) } : {}),
     });
   } catch (err) {
     logger.error(err, 'Failed to notify owner');
@@ -92,10 +93,10 @@ export const scheduler = {
       })
     );
 
-    // Post generation
+    // Post auto-generation: 30 min before each slot (08:30, 12:30, 17:30 MSK = 05:30, 09:30, 14:30 UTC)
     tasks.push(
-      cron.schedule(config.POST_GEN_CRON, async () => {
-        logger.info('Cron: generating post');
+      cron.schedule('30 5,9,14 * * *', async () => {
+        logger.info('Cron: auto-generating post for next slot');
         try {
           const post = await postGenerator.generate();
           if (post) {
@@ -108,7 +109,7 @@ export const scheduler = {
       })
     );
 
-    // Publish scheduled posts + pace check
+    // Publish scheduled posts
     tasks.push(
       cron.schedule(config.PUBLISH_CHECK_CRON, async () => {
         try {

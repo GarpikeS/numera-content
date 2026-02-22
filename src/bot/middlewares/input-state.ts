@@ -28,10 +28,13 @@ export async function inputStateHandler(ctx: BotContext, next: NextFunction): Pr
       // Re-show review keyboard
       const post = postQueries.getById(state.postId);
       if (post) {
-        const { getReviewKeyboard } = await import('../keyboards/review');
+        const { getReviewKeyboard, formatSlotLabel } = await import('../keyboards/review');
+        const { postQueries: pq } = await import('../../database/queries/posts');
+        const slot = pq.findNextFreeSlot();
+        const label = formatSlotLabel(slot);
         await ctx.reply(post.content, {
           parse_mode: 'HTML',
-          reply_markup: getReviewKeyboard(post.id),
+          reply_markup: getReviewKeyboard(post.id, label),
         });
       }
     } catch (err) {

@@ -2,7 +2,7 @@ import type { BotContext } from '../context';
 import { postQueries } from '../../database/queries/posts';
 import { publishService } from '../../services/publish-service';
 import { postGenerator } from '../../services/post-generator';
-import { getReviewKeyboard } from '../keyboards/review';
+import { getReviewKeyboard, formatSlotLabel } from '../keyboards/review';
 import { logger } from '../../logger';
 import { truncate } from '../../utils/truncate';
 
@@ -11,11 +11,6 @@ export async function reviewCallback(ctx: BotContext): Promise<void> {
   if (!data) return;
 
   const parts = data.split(':');
-  // review:action:postId or schedule:hour:postId
-  if (parts[0] === 'schedule') {
-    return handleSchedule(ctx, parts);
-  }
-
   const action = parts[1];
   const postId = parseInt(parts[2], 10);
 
@@ -26,6 +21,8 @@ export async function reviewCallback(ctx: BotContext): Promise<void> {
   }
 
   switch (action) {
+    case 'approve':
+      return handleApprove(ctx, postId);
     case 'publish':
       return handlePublish(ctx, postId);
     case 'edit':
@@ -36,6 +33,21 @@ export async function reviewCallback(ctx: BotContext): Promise<void> {
       return handleReject(ctx, postId);
     default:
       await ctx.answerCallbackQuery({ text: 'Неизвестное действие' });
+  }
+}
+
+async function handleApprove(ctx: BotContext, postId: number): Promise<void> {
+  try {
+    const slot = postQueries.findNextFreeSlot();
+    const label = formatSlotLabel(slot);
+    postQueries.schedule(postId, slot.toISOString());
+
+    await ctx.editMessageText(`Запланировано на ${label} МСК`);
+    await ctx.answerCallbackQuery({ text: `Запланировано: ${label}` });
+    logger.info({ postId, slot: slot.toISOString(), label }, 'Post auto-scheduled');
+  } catch (err) {
+    logger.error(err, 'Auto-schedule failed');
+    await ctx.answerCallbackQuery({ text: 'Ошибка планирования' });
   }
 }
 
@@ -54,28 +66,6 @@ async function handlePublish(ctx: BotContext, postId: number): Promise<void> {
   }
 }
 
-async function handleSchedule(ctx: BotContext, parts: string[]): Promise<void> {
-  const hour = parseInt(parts[1], 10);
-  const postId = parseInt(parts[2], 10);
-
-  // Schedule for today or tomorrow at the given hour (MSK = UTC+3)
-  const now = new Date();
-  const utcHour = hour - 3;
-  const scheduled = new Date(now);
-  scheduled.setUTCHours(utcHour, 0, 0, 0);
-
-  // If time already passed today — schedule for tomorrow
-  const isToday = scheduled > now;
-  if (!isToday) {
-    scheduled.setDate(scheduled.getDate() + 1);
-  }
-
-  const dayLabel = isToday ? 'сегодня' : 'завтра';
-  postQueries.schedule(postId, scheduled.toISOString());
-  await ctx.editMessageText(`Запланировано на ${dayLabel} ${hour}:00 МСК`);
-  await ctx.answerCallbackQuery({ text: 'Запланировано' });
-}
-
 async function handleEdit(ctx: BotContext, postId: number): Promise<void> {
   ctx.session.inputState = { mode: 'edit_post', postId };
   await ctx.answerCallbackQuery();
@@ -87,14 +77,16 @@ async function handleRegen(ctx: BotContext, postId: number): Promise<void> {
   try {
     const post = await postGenerator.regenerate(postId);
     if (post) {
+      const slot = postQueries.findNextFreeSlot();
+      const label = formatSlotLabel(slot);
       try {
         await ctx.editMessageText(truncate(post.content), {
           parse_mode: 'HTML',
-          reply_markup: getReviewKeyboard(post.id),
+          reply_markup: getReviewKeyboard(post.id, label),
         });
       } catch {
         await ctx.editMessageText(truncate(post.content), {
-          reply_markup: getReviewKeyboard(post.id),
+          reply_markup: getReviewKeyboard(post.id, label),
         });
       }
     }

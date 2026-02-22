@@ -13,9 +13,8 @@ const envSchema = z.object({
   RSSHUB_BASE_URL: z.string().url().default('https://rsshub.app'),
   SCAN_CRON: z.string().default('0 */2 * * *'),
   DIGEST_CRON: z.string().default('0 5 * * *'),
-  POST_GEN_CRON: z.string().default('0 4,8 * * *'),
+  POST_GEN_CRON: z.string().default('30 5,9,14 * * *'),
   PUBLISH_CHECK_CRON: z.string().default('*/10 * * * *'),
-  MAX_POSTS_PER_DAY: z.coerce.number().int().positive().default(3),
   DB_PATH: z.string().default('./data/numera-content.db'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 });
