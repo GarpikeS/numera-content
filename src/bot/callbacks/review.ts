@@ -2,7 +2,7 @@ import type { BotContext } from '../context';
 import { postQueries } from '../../database/queries/posts';
 import { publishService } from '../../services/publish-service';
 import { postGenerator } from '../../services/post-generator';
-import { getReviewKeyboard, getScheduleKeyboard } from '../keyboards/review';
+import { getReviewKeyboard } from '../keyboards/review';
 import { logger } from '../../logger';
 import { truncate } from '../../utils/truncate';
 
@@ -28,18 +28,12 @@ export async function reviewCallback(ctx: BotContext): Promise<void> {
   switch (action) {
     case 'publish':
       return handlePublish(ctx, postId);
-    case 'schedule':
-      return showSchedule(ctx, postId);
     case 'edit':
       return handleEdit(ctx, postId);
     case 'regen':
       return handleRegen(ctx, postId);
     case 'reject':
       return handleReject(ctx, postId);
-    case 'back':
-      await ctx.editMessageReplyMarkup({ reply_markup: getReviewKeyboard(postId) });
-      await ctx.answerCallbackQuery();
-      return;
     default:
       await ctx.answerCallbackQuery({ text: 'Неизвестное действие' });
   }
@@ -60,25 +54,25 @@ async function handlePublish(ctx: BotContext, postId: number): Promise<void> {
   }
 }
 
-async function showSchedule(ctx: BotContext, postId: number): Promise<void> {
-  await ctx.editMessageReplyMarkup({ reply_markup: getScheduleKeyboard(postId) });
-  await ctx.answerCallbackQuery();
-}
-
 async function handleSchedule(ctx: BotContext, parts: string[]): Promise<void> {
   const hour = parseInt(parts[1], 10);
   const postId = parseInt(parts[2], 10);
 
-  // Schedule for today at the given hour (MSK = UTC+3)
+  // Schedule for today or tomorrow at the given hour (MSK = UTC+3)
   const now = new Date();
+  const utcHour = hour - 3;
   const scheduled = new Date(now);
-  scheduled.setUTCHours(hour - 3, 0, 0, 0); // Convert MSK to UTC
-  if (scheduled <= now) {
+  scheduled.setUTCHours(utcHour, 0, 0, 0);
+
+  // If time already passed today — schedule for tomorrow
+  const isToday = scheduled > now;
+  if (!isToday) {
     scheduled.setDate(scheduled.getDate() + 1);
   }
 
+  const dayLabel = isToday ? 'сегодня' : 'завтра';
   postQueries.schedule(postId, scheduled.toISOString());
-  await ctx.editMessageText(`Запланировано на ${hour}:00 МСК`);
+  await ctx.editMessageText(`Запланировано на ${dayLabel} ${hour}:00 МСК`);
   await ctx.answerCallbackQuery({ text: 'Запланировано' });
 }
 
