@@ -5,12 +5,16 @@ import { channelMonitor } from './channel-monitor';
 import { digestGenerator } from './digest-generator';
 import { postGenerator } from './post-generator';
 import { publishService } from './publish-service';
+import { postQueries } from '../database/queries/posts';
 import { logger } from '../logger';
 import { truncate } from '../utils/truncate';
 import { getReviewKeyboard } from '../bot/keyboards/review';
 
 const tasks: cron.ScheduledTask[] = [];
 let api: Api<RawApi> | null = null;
+
+// Publish slots in MSK hours
+const PUBLISH_SLOTS = [9, 13, 18];
 
 async function notifyOwner(text: string, postId?: number): Promise<void> {
   if (!api) return;
@@ -20,6 +24,36 @@ async function notifyOwner(text: string, postId?: number): Promise<void> {
     });
   } catch (err) {
     logger.error(err, 'Failed to notify owner');
+  }
+}
+
+/**
+ * Check how many posts published today vs how many slots passed.
+ * If 2+ slots missed — ping owner.
+ */
+async function checkPublishPace(): Promise<void> {
+  const nowMsk = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  const currentHour = nowMsk.getUTCHours();
+
+  const slotsPassed = PUBLISH_SLOTS.filter(h => currentHour >= h).length;
+  if (slotsPassed < 2) return; // Too early to judge
+
+  const published = postQueries.countToday();
+  const missed = slotsPassed - published;
+
+  if (missed >= 2) {
+    const pending = postQueries.getPending();
+    const pendingCount = pending.length;
+
+    let msg = `На сегодня пропущено ${missed} из ${slotsPassed} слотов публикации (опубликовано: ${published}).`;
+    if (pendingCount > 0) {
+      msg += `\n\nЕсть ${pendingCount} постов на проверке — одобри или запланируй.`;
+    } else {
+      msg += `\n\nНет постов на проверке. Нажми «Новый пост» чтобы сгенерировать.`;
+    }
+
+    await notifyOwner(msg, pending[0]?.id);
+    logger.info({ missed, published, slotsPassed }, 'Publish pace ping sent');
   }
 }
 
@@ -74,7 +108,7 @@ export const scheduler = {
       })
     );
 
-    // Publish scheduled posts
+    // Publish scheduled posts + pace check
     tasks.push(
       cron.schedule(config.PUBLISH_CHECK_CRON, async () => {
         try {
@@ -84,6 +118,17 @@ export const scheduler = {
           }
         } catch (err) {
           logger.error(err, 'Cron: publish check failed');
+        }
+      })
+    );
+
+    // Publish pace pings — check after 2nd and 3rd slots (13:10 and 18:10 MSK = 10:10 and 15:10 UTC)
+    tasks.push(
+      cron.schedule('10 10,15 * * *', async () => {
+        try {
+          await checkPublishPace();
+        } catch (err) {
+          logger.error(err, 'Cron: pace check failed');
         }
       })
     );
