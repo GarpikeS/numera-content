@@ -14,8 +14,9 @@ async function main(): Promise<void> {
   // Create bot
   const bot = createBot();
 
-  // Initialize publish service with bot instance
+  // Initialize services with bot API
   publishService.init(bot.api);
+  scheduler.init(bot.api);
 
   // Start scheduler
   scheduler.start();

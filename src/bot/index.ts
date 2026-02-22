@@ -1,5 +1,6 @@
 import { Bot, session } from 'grammy';
 import { config } from '../config';
+import { logger } from '../logger';
 import { BotContext, initialSession } from './context';
 import { ownerGuard } from './middlewares/owner-guard';
 import { inputStateHandler } from './middlewares/input-state';
@@ -17,6 +18,11 @@ import { ideaActionsCallback } from './callbacks/idea-actions';
 
 export function createBot(): Bot<BotContext> {
   const bot = new Bot<BotContext>(config.BOT_TOKEN);
+
+  // Error handler
+  bot.catch((err) => {
+    logger.error(err.error, `Error in ${err.ctx.update.update_id}`);
+  });
 
   // Session
   bot.use(session({ initial: initialSession }));

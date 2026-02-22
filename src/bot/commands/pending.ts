@@ -7,17 +7,23 @@ export async function pendingCommand(ctx: BotContext): Promise<void> {
   const posts = postQueries.getPending();
 
   if (posts.length === 0) {
-    await ctx.reply('Нет постов на модерации.');
+    await ctx.reply('Нет постов на проверке.');
     return;
   }
 
+  await ctx.reply(`На проверке: ${posts.length}`);
+
   for (const post of posts) {
-    await ctx.reply(
-      `<b>Пост #${post.id}</b>\n\n${truncate(post.content)}`,
-      {
+    try {
+      await ctx.reply(truncate(post.content), {
         parse_mode: 'HTML',
         reply_markup: getReviewKeyboard(post.id),
-      }
-    );
+      });
+    } catch {
+      // HTML parse failed — send as plain text
+      await ctx.reply(truncate(post.content), {
+        reply_markup: getReviewKeyboard(post.id),
+      });
+    }
   }
 }

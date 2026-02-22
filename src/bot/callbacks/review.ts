@@ -93,10 +93,16 @@ async function handleRegen(ctx: BotContext, postId: number): Promise<void> {
   try {
     const post = await postGenerator.regenerate(postId);
     if (post) {
-      await ctx.editMessageText(truncate(post.content), {
-        parse_mode: 'HTML',
-        reply_markup: getReviewKeyboard(post.id),
-      });
+      try {
+        await ctx.editMessageText(truncate(post.content), {
+          parse_mode: 'HTML',
+          reply_markup: getReviewKeyboard(post.id),
+        });
+      } catch {
+        await ctx.editMessageText(truncate(post.content), {
+          reply_markup: getReviewKeyboard(post.id),
+        });
+      }
     }
   } catch (err) {
     logger.error(err, 'Regen failed');
