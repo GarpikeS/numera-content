@@ -36,11 +36,15 @@ export async function reviewCallback(ctx: BotContext): Promise<void> {
   }
 }
 
+function toSqliteDatetime(date: Date): string {
+  return date.toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
+}
+
 async function handleApprove(ctx: BotContext, postId: number): Promise<void> {
   try {
     const slot = postQueries.findNextFreeSlot();
     const label = formatSlotLabel(slot);
-    postQueries.schedule(postId, slot.toISOString());
+    postQueries.schedule(postId, toSqliteDatetime(slot));
 
     await ctx.editMessageText(`Запланировано на ${label} МСК`);
     await ctx.answerCallbackQuery({ text: `Запланировано: ${label}` });
