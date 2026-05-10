@@ -8,21 +8,22 @@ import { publishService } from './publish-service';
 import { postQueries } from '../database/queries/posts';
 import { logger } from '../logger';
 import { truncate } from '../utils/truncate';
-import { getReviewKeyboard, formatSlotLabel } from '../bot/keyboards/review';
+import { formatSlotLabel } from '../bot/keyboards/review';
 
 const tasks: cron.ScheduledTask[] = [];
 let api: Api<RawApi> | null = null;
 
 // Publish slots in MSK hours
-const PUBLISH_SLOTS = [9, 13, 18];
+const PUBLISH_SLOTS = [10];
 
-async function notifyOwner(text: string, postId?: number): Promise<void> {
+function toSqliteDatetime(date: Date): string {
+  return date.toISOString().replace('T', ' ').replace('Z', '').slice(0, 19);
+}
+
+async function notifyOwner(text: string): Promise<void> {
   if (!api) return;
   try {
-    const slotLabel = postId ? formatSlotLabel(postQueries.findNextFreeSlot()) : undefined;
-    await api.sendMessage(config.OWNER_ID, text, {
-      ...(postId ? { reply_markup: getReviewKeyboard(postId, slotLabel) } : {}),
-    });
+    await api.sendMessage(config.OWNER_ID, text);
   } catch (err) {
     logger.error(err, 'Failed to notify owner');
   }
@@ -30,30 +31,30 @@ async function notifyOwner(text: string, postId?: number): Promise<void> {
 
 /**
  * Check how many posts published today vs how many slots passed.
- * If 2+ slots missed — ping owner.
+ * If the daily slot is missed — ping owner.
  */
 async function checkPublishPace(): Promise<void> {
   const nowMsk = new Date(Date.now() + 3 * 60 * 60 * 1000);
   const currentHour = nowMsk.getUTCHours();
 
   const slotsPassed = PUBLISH_SLOTS.filter(h => currentHour >= h).length;
-  if (slotsPassed < 2) return; // Too early to judge
+  if (slotsPassed < 1) return; // Too early to judge
 
   const published = postQueries.countToday();
   const missed = slotsPassed - published;
 
-  if (missed >= 2) {
+  if (missed >= 1) {
     const pending = postQueries.getPending();
     const pendingCount = pending.length;
 
-    let msg = `На сегодня пропущено ${missed} из ${slotsPassed} слотов публикации (опубликовано: ${published}).`;
+    let msg = `Автопостинг отстал: сегодня пропущено ${missed} из ${slotsPassed} слотов публикации (опубликовано: ${published}).`;
     if (pendingCount > 0) {
-      msg += `\n\nЕсть ${pendingCount} постов на проверке — одобри или запланируй.`;
+      msg += `\n\nЕсть ${pendingCount} постов в pending. Автопостинг работает без утверждения, проверь генерацию/планирование.`;
     } else {
-      msg += `\n\nНет постов на проверке. Нажми «Новый пост» чтобы сгенерировать.`;
+      msg += `\n\nНет pending-постов. Проверь генерацию и publish-check.`;
     }
 
-    await notifyOwner(msg, pending[0]?.id);
+    await notifyOwner(msg);
     logger.info({ missed, published, slotsPassed }, 'Publish pace ping sent');
   }
 }
@@ -93,15 +94,18 @@ export const scheduler = {
       })
     );
 
-    // Post auto-generation: 30 min before each slot (08:30, 12:30, 17:30 MSK = 05:30, 09:30, 14:30 UTC)
+    // Post auto-generation: 30 min before the daily slot (09:30 MSK = 06:30 UTC)
     tasks.push(
-      cron.schedule('30 5,9,14 * * *', async () => {
-        logger.info('Cron: auto-generating post for next slot');
+      cron.schedule(config.POST_GEN_CRON, async () => {
+        logger.info('Cron: auto-generating post for daily slot');
         try {
           const post = await postGenerator.generate();
           if (post) {
-            logger.info({ postId: post.id }, 'Cron: post generated');
-            await notifyOwner(`Новый пост готов к проверке:\n\n${truncate(post.content, 3500)}`, post.id);
+            const slot = postQueries.findNextFreeSlot();
+            const label = formatSlotLabel(slot);
+            postQueries.schedule(post.id, toSqliteDatetime(slot));
+            logger.info({ postId: post.id, slot: slot.toISOString(), label }, 'Cron: post generated and scheduled');
+            await notifyOwner(`Автопост запланирован на ${label} МСК без утверждения:\n\n${truncate(post.content, 3500)}`);
           }
         } catch (err) {
           logger.error(err, 'Cron: post generation failed');
@@ -123,9 +127,9 @@ export const scheduler = {
       })
     );
 
-    // Publish pace pings — check after 2nd and 3rd slots (13:10 and 18:10 MSK = 10:10 and 15:10 UTC)
+    // Publish pace ping — check after the daily slot (10:10 MSK = 07:10 UTC)
     tasks.push(
-      cron.schedule('10 10,15 * * *', async () => {
+      cron.schedule('10 7 * * *', async () => {
         try {
           await checkPublishPace();
         } catch (err) {

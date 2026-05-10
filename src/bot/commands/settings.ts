@@ -7,7 +7,7 @@ export async function settingsCommand(ctx: BotContext): Promise<void> {
     `Сканирование: <code>${config.SCAN_CRON}</code>\n` +
     `Дайджест: <code>${config.DIGEST_CRON}</code>\n` +
     `Генерация: <code>${config.POST_GEN_CRON}</code>\n` +
-    `Слоты публикации: 09:00, 13:00, 18:00 МСК\n` +
+    `Слот публикации: 10:00 МСК\n` +
     `Проверка публикации: <code>${config.PUBLISH_CHECK_CRON}</code>\n` +
     `LLM: ${config.LLM_MODEL}\n` +
     `RSSHub: ${config.RSSHUB_BASE_URL}\n\n` +

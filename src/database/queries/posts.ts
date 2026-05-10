@@ -2,7 +2,7 @@ import { getDb } from '../db';
 import type { Post, PostStatus } from '../../types';
 
 // Publish slots in MSK hours
-const PUBLISH_SLOTS = [9, 13, 18];
+const PUBLISH_SLOTS = [10];
 
 export const postQueries = {
   create(content: string, sourceType: string, digestId?: number): Post {
@@ -104,7 +104,7 @@ export const postQueries = {
 
   /**
    * Find the next free publish slot starting from now.
-   * Slots are 09:00, 13:00, 18:00 MSK (06, 10, 15 UTC).
+   * Slot is 10:00 MSK (07:00 UTC).
    * Skips already occupied slots. Searches up to 30 days ahead.
    */
   findNextFreeSlot(): Date {
